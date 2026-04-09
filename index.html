@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Habit Tracker</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -481,6 +482,65 @@
     }
     .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
 
+    /* ── Auth screen ── */
+    .auth-screen {
+      min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+    }
+    .auth-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 36px 28px; width: 100%; max-width: 380px;
+      text-align: center;
+    }
+    .auth-logo { font-size: 2rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 6px; }
+    .auth-logo span { color: var(--accent-light); }
+    .auth-sub { color: var(--text-muted); font-size: 0.9rem; margin-bottom: 32px; line-height: 1.5; }
+    .btn-google {
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px;
+      background: #fff; color: #1a1a2e; border: 1px solid #ddd;
+      border-radius: 10px; padding: 13px; font-size: 0.95rem; font-weight: 600;
+      cursor: pointer; transition: box-shadow 0.15s;
+    }
+    .btn-google:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.15); }
+    .btn-google img { width: 20px; height: 20px; }
+    .auth-footer { margin-top: 20px; font-size: 0.75rem; color: var(--text-muted); line-height: 1.5; }
+
+    /* ── User bar ── */
+    .user-bar {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .user-avatar {
+      width: 28px; height: 28px; border-radius: 50%; object-fit: cover;
+      border: 2px solid var(--border);
+    }
+    .user-name { font-size: 0.8rem; font-weight: 600; color: var(--text-muted); max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-signout {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text-muted); font-size: 0.75rem; font-weight: 600;
+      padding: 4px 10px; border-radius: 6px; cursor: pointer; transition: all 0.15s;
+    }
+    .btn-signout:hover { color: var(--danger); border-color: var(--danger); }
+
+    /* ── Loading spinner ── */
+    .loading-screen {
+      min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 12px; color: var(--text-muted);
+    }
+    .spinner {
+      width: 32px; height: 32px; border: 3px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Sync indicator ── */
+    .sync-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: var(--success);
+      display: inline-block; margin-left: 4px;
+    }
+    .sync-dot.syncing { background: var(--warning); animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+
     /* ── Responsive ── */
     @media (max-width: 420px) {
       .summary { gap: 7px; }
@@ -491,6 +551,28 @@
 </head>
 <body>
 
+<!-- ═══════════════════════════ LOADING ══════════════════════════ -->
+<div class="loading-screen" id="loading-screen">
+  <div class="spinner"></div>
+  <span>Loading…</span>
+</div>
+
+<!-- ═══════════════════════════ AUTH SCREEN ══════════════════════ -->
+<div class="auth-screen" id="auth-screen" style="display:none">
+  <div class="auth-card">
+    <div class="auth-logo">habit<span>.</span></div>
+    <div class="auth-sub">Track your habits, build your streaks.<br>Sign in to sync across all your devices.</div>
+    <button class="btn-google" id="google-signin-btn">
+      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
+      Continue with Google
+    </button>
+    <div class="auth-footer">Your data is private and only visible to you.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ APP ══════════════════════════════ -->
+<div id="app" style="display:none">
+
 <!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
 <header>
   <div class="header-inner">
@@ -498,6 +580,11 @@
     <div class="header-right">
       <div class="date-pill" id="date-display"></div>
       <button class="icon-btn" id="theme-btn" title="Toggle theme">☀️</button>
+      <div class="user-bar">
+        <img class="user-avatar" id="user-avatar" src="" alt="" style="display:none" />
+        <span class="user-name" id="user-name"></span>
+        <button class="btn-signout" id="signout-btn">Sign out</button>
+      </div>
     </div>
   </div>
   <div class="nav-tabs">
@@ -638,7 +725,20 @@
 
 <div class="toast" id="toast"></div>
 
-<script>
+</div> <!-- end #app -->
+
+<script type="module">
+// ══════════════════════════════════════════════════════════════════
+//  SUPABASE INIT
+// ══════════════════════════════════════════════════════════════════
+
+const SUPABASE_URL = 'https://azjegqxmybnvduqnhzfy.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6amVncXhteWJudmR1cW5oemZ5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU3NDg1MzAsImV4cCI6MjA5MTMyNDUzMH0.G5IgqReyBKbBfJ3nCil3MoluliMIpR8t2CYukcYdaFQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let currentUser = null;
+let syncing = false;
+
 // ══════════════════════════════════════════════════════════════════
 //  CONSTANTS & CONFIG
 // ══════════════════════════════════════════════════════════════════
@@ -701,7 +801,7 @@ function dateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
 
-function loadData() {
+function loadLocalData() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) return JSON.parse(raw);
@@ -709,13 +809,81 @@ function loadData() {
   return { habits: [], theme: 'dark' };
 }
 
-function saveData() {
+function saveLocal() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
 
-let data = loadData();
+// Convert DB row → local habit object
+function rowToHabit(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color || '#7c6af7',
+    category: row.category || '',
+    schedule: row.schedule || 'daily',
+    customDays: row.custom_days || [],
+    reminder: row.reminder || false,
+    reminderTime: row.reminder_time || '08:00',
+    completions: row.completions || {},
+    freezesLeft: row.freezes_left ?? 2,
+    createdAt: row.created_at,
+  };
+}
+
+// Convert local habit → DB row fields
+function habitToRow(habit) {
+  return {
+    user_id: currentUser.id,
+    name: habit.name,
+    color: habit.color,
+    category: habit.category,
+    schedule: habit.schedule,
+    custom_days: habit.customDays,
+    reminder: habit.reminder,
+    reminder_time: habit.reminderTime,
+    completions: habit.completions,
+    freezes_left: habit.freezesLeft,
+  };
+}
+
+async function loadHabitsFromDB() {
+  const { data: rows, error } = await sb.from('habits').select('*').order('created_at');
+  if (error) { console.error(error); return; }
+  data.habits = rows.map(rowToHabit);
+  saveLocal();
+  render();
+  if (activeView === 'stats') renderStats();
+}
+
+async function saveHabitToDB(habit) {
+  if (!currentUser) return;
+  const row = habitToRow(habit);
+  if (habit.id) {
+    const { error } = await sb.from('habits').update(row).eq('id', habit.id);
+    if (error) console.error('Update error:', error);
+  } else {
+    const { data: inserted, error } = await sb.from('habits').insert(row).select().single();
+    if (error) { console.error('Insert error:', error); return; }
+    habit.id = inserted.id;
+  }
+  saveLocal();
+}
+
+async function deleteHabitFromDB(id) {
+  if (!currentUser || !id) return;
+  const { error } = await sb.from('habits').delete().eq('id', id);
+  if (error) console.error('Delete error:', error);
+}
+
+let data = loadLocalData();
 if (!data.habits) data.habits = [];
 if (!data.theme) data.theme = 'dark';
+
+// saveData now syncs to DB if logged in
+async function saveData(habit) {
+  saveLocal();
+  if (currentUser && habit) await saveHabitToDB(habit);
+}
 
 // ══════════════════════════════════════════════════════════════════
 //  HELPERS
@@ -1065,13 +1233,13 @@ function renderHabitStats() {
 //  ACTIONS
 // ══════════════════════════════════════════════════════════════════
 
-function addHabit(name, opts = {}) {
+async function addHabit(name, opts = {}) {
   name = name.trim();
   if (!name) return;
   if (data.habits.some(h => h.name.toLowerCase() === name.toLowerCase())) {
     showToast('Habit already exists'); return;
   }
-  data.habits.push({
+  const habit = {
     name,
     color: opts.color || COLORS[data.habits.length % COLORS.length],
     category: opts.category || '',
@@ -1082,12 +1250,13 @@ function addHabit(name, opts = {}) {
     completions: {},
     freezesLeft: 2,
     createdAt: todayStr(),
-  });
-  saveData();
+  };
+  data.habits.push(habit);
   render();
+  await saveData(habit);
 }
 
-function toggleHabit(idx) {
+async function toggleHabit(idx) {
   const today = todayStr();
   const habit = data.habits[idx];
   if (!habit) return;
@@ -1101,8 +1270,8 @@ function toggleHabit(idx) {
     habit.completions[today] = note ? { done: true, note } : true;
   }
 
-  saveData();
   render();
+  await saveData(habit);
 
   if (!wasDone) {
     const streak = calcStreak(habit);
@@ -1112,7 +1281,7 @@ function toggleHabit(idx) {
   }
 }
 
-function useFreeze(idx) {
+async function useFreeze(idx) {
   const today = todayStr();
   const habit = data.habits[idx];
   if (!habit || habit.freezesLeft <= 0) return;
@@ -1121,18 +1290,21 @@ function useFreeze(idx) {
   const note = entry && entry.note ? entry.note : undefined;
   habit.completions[today] = { freeze: true, note };
   habit.freezesLeft--;
-  saveData();
   render();
+  await saveData(habit);
   showToast(`❄️ Streak freeze used for "${habit.name}" (${habit.freezesLeft} left)`);
 }
 
-function deleteHabit(idx) {
+async function deleteHabit(idx) {
   if (!confirm(`Delete "${data.habits[idx]?.name}"? This removes all history.`)) return;
-  const name = data.habits[idx]?.name;
+  const habit = data.habits[idx];
+  const name = habit?.name;
+  const id = habit?.id;
   data.habits.splice(idx, 1);
-  saveData();
+  saveLocal();
   render();
   if (activeView === 'stats') renderStats();
+  if (id) await deleteHabitFromDB(id);
   showToast(`Deleted "${name}"`);
 }
 
@@ -1254,7 +1426,7 @@ document.getElementById('habit-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('habit-modal')) closeModal();
 });
 
-document.getElementById('modal-save').addEventListener('click', () => {
+document.getElementById('modal-save').addEventListener('click', async () => {
   const name = document.getElementById('modal-name').value.trim();
   if (!name) { showToast('Please enter a habit name'); return; }
   const reminder = document.getElementById('reminder-toggle').checked;
@@ -1269,11 +1441,11 @@ document.getElementById('modal-save').addEventListener('click', () => {
     h.customDays = [...modalState.customDays];
     h.reminder = reminder;
     h.reminderTime = reminderTime;
-    saveData();
     render();
+    await saveData(h);
     showToast(`Updated "${name}"`);
   } else {
-    addHabit(name, { ...modalState, reminder, reminderTime });
+    await addHabit(name, { ...modalState, reminder, reminderTime });
     showToast(`Added "${name}"`);
   }
   closeModal();
@@ -1307,7 +1479,7 @@ document.getElementById('note-modal').addEventListener('click', e => {
   if (e.target === document.getElementById('note-modal')) closeNoteModal();
 });
 
-document.getElementById('note-save').addEventListener('click', () => {
+document.getElementById('note-save').addEventListener('click', async () => {
   if (noteIdx === null) return;
   const note = document.getElementById('note-textarea').value.trim();
   const today = todayStr();
@@ -1322,8 +1494,8 @@ document.getElementById('note-save').addEventListener('click', () => {
     habit.completions[today] = isDone || false;
   }
 
-  saveData();
   render();
+  await saveData(habit);
   closeNoteModal();
   showToast('Note saved');
 });
@@ -1514,19 +1686,91 @@ function updateDate() {
 }
 
 // ══════════════════════════════════════════════════════════════════
+//  AUTH
+// ══════════════════════════════════════════════════════════════════
+
+function showLoadingScreen() {
+  document.getElementById('loading-screen').style.display = 'flex';
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'none';
+}
+
+function showAuthScreen() {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+}
+
+function showApp() {
+  document.getElementById('loading-screen').style.display = 'none';
+  document.getElementById('auth-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+}
+
+function setUserUI(user) {
+  const nameEl = document.getElementById('user-name');
+  const avatarEl = document.getElementById('user-avatar');
+  const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'You';
+  const avatar = user.user_metadata?.avatar_url;
+  nameEl.textContent = name;
+  if (avatar) { avatarEl.src = avatar; avatarEl.style.display = 'block'; }
+  else { avatarEl.style.display = 'none'; }
+}
+
+document.getElementById('google-signin-btn').addEventListener('click', async () => {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.href }
+  });
+  if (error) showToast('Sign in failed: ' + error.message);
+});
+
+document.getElementById('signout-btn').addEventListener('click', async () => {
+  await sb.auth.signOut();
+  currentUser = null;
+  data.habits = [];
+  showAuthScreen();
+});
+
+// ══════════════════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════════════════
 
-updateDate();
-renderTemplates();
-render();
-setupReminderLoop();
-requestNotificationPermission();
+async function initApp(user) {
+  currentUser = user;
+  setUserUI(user);
+  showApp();
+  applyTheme(data.theme);
+  updateDate();
+  renderTemplates();
+  render();
+  await loadHabitsFromDB();
+  setupReminderLoop();
+  requestNotificationPermission();
 
-// Midnight refresh
-const now = new Date();
-const msToMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1) - now;
-setTimeout(() => { updateDate(); render(); }, msToMidnight);
+  // Midnight refresh
+  const now = new Date();
+  const msToMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1) - now;
+  setTimeout(() => { updateDate(); render(); }, msToMidnight);
+}
+
+// Listen for auth state changes
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (session?.user) {
+    await initApp(session.user);
+  } else {
+    showAuthScreen();
+  }
+});
+
+// Initial check
+showLoadingScreen();
+const { data: { session } } = await sb.auth.getSession();
+if (session?.user) {
+  await initApp(session.user);
+} else {
+  showAuthScreen();
+}
 </script>
 </body>
 </html>
