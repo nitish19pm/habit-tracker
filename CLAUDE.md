@@ -31,7 +31,7 @@ reminder_time text, completions jsonb, freezes_left integer, created_at timestam
 - **Notes** — add a note to any habit on any day
 - **Milestone celebrations** — animated popup at 7, 14, 21, 30, 50, 100 day streaks
 - **Quick templates** — 10 pre-built habits (Drink water, Exercise, Meditate, etc.)
-- **Stats view** — 4-week (1 month) activity heatmap, completion rates, habit strength score (0-100)
+- **Stats view** — 4-week activity heatmap (CSS grid, fills full width, staggered cell animation, day labels, legend), completion rates, habit strength score (0-100)
 - **CSV export** of full history
 - **Light/dark mode toggle** (persisted)
 - **Date navigation** — arrow buttons + tap-to-open calendar picker to view/edit any past 30 days
