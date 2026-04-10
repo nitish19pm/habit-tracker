@@ -541,6 +541,90 @@
     .sync-dot.syncing { background: var(--warning); animation: pulse 1s infinite; }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
 
+    /* ── Date navigator ── */
+    .date-nav {
+      display: flex; align-items: center; gap: 4px;
+    }
+    .date-nav-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text-muted); width: 28px; height: 28px; border-radius: 7px;
+      cursor: pointer; font-size: 1rem; display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s; flex-shrink: 0;
+    }
+    .date-nav-btn:hover:not(:disabled) { background: var(--surface3); color: var(--text); }
+    .date-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .date-pill {
+      font-size: 0.78rem; font-weight: 500; color: var(--text-muted);
+      background: var(--surface2); border: 1px solid var(--border);
+      padding: 5px 12px; border-radius: 999px; cursor: pointer;
+      transition: all 0.15s; user-select: none; position: relative;
+    }
+    .date-pill:hover { border-color: var(--accent); color: var(--text); }
+    .date-pill.past { border-color: var(--warning); color: var(--warning); background: rgba(251,191,36,0.08); }
+
+    /* ── Calendar picker ── */
+    .cal-dropdown {
+      position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; padding: 14px; z-index: 200;
+      box-shadow: 0 8px 32px var(--shadow); min-width: 260px;
+      display: none;
+    }
+    .cal-dropdown.open { display: block; }
+    .cal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .cal-month-label { font-size: 0.85rem; font-weight: 700; }
+    .cal-nav-btn {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text-muted); width: 26px; height: 26px; border-radius: 6px;
+      cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+    }
+    .cal-nav-btn:hover { background: var(--surface3); color: var(--text); }
+    .cal-nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+    .cal-day-header {
+      font-size: 0.65rem; font-weight: 700; color: var(--text-muted);
+      text-align: center; padding: 2px 0; text-transform: uppercase;
+    }
+    .cal-day {
+      aspect-ratio: 1; border-radius: 7px; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; cursor: pointer;
+      font-size: 0.78rem; font-weight: 500; position: relative;
+      transition: background 0.1s; color: var(--text);
+    }
+    .cal-day:hover:not(.disabled):not(.empty) { background: var(--surface2); }
+    .cal-day.selected { background: var(--accent); color: #fff; }
+    .cal-day.today-cal { font-weight: 800; }
+    .cal-day.today-cal:not(.selected)::after {
+      content: ''; position: absolute; bottom: 3px;
+      width: 4px; height: 4px; border-radius: 50%; background: var(--accent);
+    }
+    .cal-day.disabled { opacity: 0.25; cursor: default; pointer-events: none; }
+    .cal-day.empty { cursor: default; }
+    .cal-dot {
+      width: 5px; height: 5px; border-radius: 50%; margin-top: 1px; flex-shrink: 0;
+    }
+    .cal-dot.full { background: var(--success); }
+    .cal-dot.partial { background: var(--accent); opacity: 0.7; }
+
+    /* ── Past-date banner ── */
+    .past-banner {
+      background: rgba(251,191,36,0.08); border-bottom: 1px solid rgba(251,191,36,0.2);
+      padding: 8px 20px; display: none;
+      align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap;
+    }
+    .past-banner.show { display: flex; }
+    .past-banner-text { font-size: 0.82rem; color: var(--warning); }
+    .btn-back-today {
+      background: var(--warning); color: #0f0f13; border: none;
+      border-radius: 8px; padding: 5px 14px; font-size: 0.8rem; font-weight: 700;
+      cursor: pointer; transition: opacity 0.15s; white-space: nowrap;
+    }
+    .btn-back-today:hover { opacity: 0.85; }
+
     /* ── Guest banner ── */
     .guest-banner {
       background: linear-gradient(135deg, rgba(124,106,247,0.12), rgba(168,156,255,0.08));
@@ -614,7 +698,14 @@
   <div class="header-inner">
     <div class="logo">habit<span>.</span></div>
     <div class="header-right">
-      <div class="date-pill" id="date-display"></div>
+      <div class="date-nav">
+        <button class="date-nav-btn" id="prev-day-btn" title="Previous day">‹</button>
+        <div style="position:relative">
+          <div class="date-pill" id="date-display" title="Click to open calendar"></div>
+          <div class="cal-dropdown" id="cal-dropdown"></div>
+        </div>
+        <button class="date-nav-btn" id="next-day-btn" title="Next day">›</button>
+      </div>
       <button class="icon-btn" id="theme-btn" title="Toggle theme">☀️</button>
       <div class="user-bar">
         <img class="user-avatar" id="user-avatar" src="" alt="" style="display:none" />
@@ -628,6 +719,12 @@
     <button class="nav-tab" data-view="stats">Stats</button>
   </div>
 </header>
+
+<!-- ═══════════════════════════ PAST DATE BANNER ══════════════════ -->
+<div class="past-banner" id="past-banner">
+  <span class="past-banner-text" id="past-banner-text">Viewing a past date</span>
+  <button class="btn-back-today" id="back-today-btn">Back to Today</button>
+</div>
 
 <!-- ═══════════════════════════ GUEST BANNER ═════════════════════ -->
 <div class="guest-banner" id="guest-banner" style="display:none">
@@ -653,19 +750,19 @@
       </div>
     </div>
 
-    <div class="section-head">
-      <div class="section-title">Add habit</div>
+    <div id="add-habit-section">
+      <div class="section-head">
+        <div class="section-title">Add habit</div>
+      </div>
+      <div class="add-form">
+        <input type="text" id="new-habit-input" placeholder="e.g. Drink water, Read 20 min…" maxlength="60" autocomplete="off" />
+        <button class="btn-add" id="add-btn" aria-label="Add habit">+</button>
+      </div>
+      <div class="section-head">
+        <div class="section-title">Quick templates</div>
+      </div>
+      <div class="templates-strip" id="templates-strip"></div>
     </div>
-
-    <div class="add-form">
-      <input type="text" id="new-habit-input" placeholder="e.g. Drink water, Read 20 min…" maxlength="60" autocomplete="off" />
-      <button class="btn-add" id="add-btn" aria-label="Add habit">+</button>
-    </div>
-
-    <div class="section-head">
-      <div class="section-title">Quick templates</div>
-    </div>
-    <div class="templates-strip" id="templates-strip"></div>
 
     <div class="section-head" style="margin-top:4px">
       <div class="section-title" id="today-habits-label">Today's habits</div>
@@ -1007,8 +1104,9 @@ function habitStrength(habit) {
 }
 
 function getLast7() {
-  const days = [], d = new Date();
-  for (let i = 6; i >= 0; i--) {
+  // Center the 7-day dots around the currently viewed date
+  const days = [], d = new Date(viewDate);
+  for (let i = 3; i >= -3; i--) {
     const dd = new Date(d); dd.setDate(dd.getDate() - i);
     days.push(dateStr(dd));
   }
@@ -1045,8 +1143,10 @@ applyTheme(data.theme);
 
 function render() {
   const today = todayStr();
+  const viewing = viewDateStr();
+  const isPast = !isViewingToday();
   const todayHabits = data.habits.filter(h => isScheduledToday(h));
-  const done = todayHabits.filter(h => getEntryDone(h.completions[today])).length;
+  const done = todayHabits.filter(h => getEntryDone(h.completions[viewing])).length;
   const total = todayHabits.length;
 
   // Summary
@@ -1078,7 +1178,7 @@ function render() {
 
   data.habits.forEach((habit, idx) => {
     const scheduledToday = isScheduledToday(habit);
-    const entry = habit.completions[today];
+    const entry = habit.completions[viewing];
     const isDone = getEntryDone(entry);
     const isFreeze = getEntryFreeze(entry);
     const streak = calcStreak(habit);
@@ -1101,15 +1201,15 @@ function render() {
     const schedMap = {daily:'',weekdays:'Weekdays',weekend:'Weekends',custom:'Custom'};
     const schedLabel = habit.schedule && habit.schedule !== 'daily' ? `<span class="schedule-badge">${schedMap[habit.schedule]||''}</span>` : '';
 
-    // Week dots
+    // Week dots — center on viewDate
     const weekDots = last7.map(d => {
       const e = habit.completions[d];
-      const isToday = d === today;
+      const isViewing = d === viewing;
       const filled = getEntryDone(e);
       const freeze = getEntryFreeze(e);
       let cls = 'week-dot';
       if (freeze) cls += ' freeze';
-      else if (filled && isToday) cls += ' today-done';
+      else if (filled && isViewing) cls += ' today-done';
       else if (filled) cls += ' filled';
       return `<div class="${cls}" title="${d}"></div>`;
     }).join('');
@@ -1117,6 +1217,16 @@ function render() {
     // Freeze badge
     const freezeHtml = isFreeze ? `<span class="freeze-badge">❄️ Freeze used</span>` : '';
     const noteHtml = note ? `<span class="streak-badge" title="${escapeHtml(note)}">📝</span>` : '';
+
+    // On past dates: hide edit/delete/freeze buttons; allow check + note
+    const actionBtns = isPast
+      ? `<button class="card-btn note-btn" data-idx="${idx}" title="Add note">📝</button>`
+      : `<button class="card-btn note-btn" data-idx="${idx}" title="Add note">📝</button>
+         ${hasFreeze && !isDone && scheduledToday && !isFreeze
+           ? `<button class="card-btn freeze-btn" data-idx="${idx}" title="Use freeze day (${habit.freezesLeft} left)">❄️</button>`
+           : ''}
+         <button class="card-btn" data-idx="${idx}" title="Edit" onclick="openEditModal(${idx})">✏️</button>
+         <button class="card-btn danger" data-idx="${idx}" title="Delete" onclick="deleteHabit(${idx})">✕</button>`;
 
     card.innerHTML = `
       ${colorBar}
@@ -1135,14 +1245,7 @@ function render() {
           ${freezeHtml}${noteHtml}
         </div>
       </div>
-      <div class="card-actions">
-        <button class="card-btn note-btn" data-idx="${idx}" title="Add note">📝</button>
-        ${hasFreeze && !isDone && scheduledToday && !isFreeze
-          ? `<button class="card-btn freeze-btn" data-idx="${idx}" title="Use freeze day (${habit.freezesLeft} left)">❄️</button>`
-          : ''}
-        <button class="card-btn" data-idx="${idx}" title="Edit" onclick="openEditModal(${idx})">✏️</button>
-        <button class="card-btn danger" data-idx="${idx}" title="Delete" onclick="deleteHabit(${idx})">✕</button>
-      </div>
+      <div class="card-actions">${actionBtns}</div>
     `;
 
     list.appendChild(card);
@@ -1299,17 +1402,17 @@ async function addHabit(name, opts = {}) {
 }
 
 async function toggleHabit(idx) {
-  const today = todayStr();
+  const viewing = viewDateStr();
   const habit = data.habits[idx];
   if (!habit) return;
-  const entry = habit.completions[today];
+  const entry = habit.completions[viewing];
   const wasDone = getEntryDone(entry);
   const note = entry && entry.note ? entry.note : undefined;
 
   if (wasDone) {
-    habit.completions[today] = note ? { done: false, note } : false;
+    habit.completions[viewing] = note ? { done: false, note } : false;
   } else {
-    habit.completions[today] = note ? { done: true, note } : true;
+    habit.completions[viewing] = note ? { done: true, note } : true;
   }
 
   render();
@@ -1317,20 +1420,24 @@ async function toggleHabit(idx) {
 
   if (!wasDone) {
     const streak = calcStreak(habit);
-    checkMilestone(habit, streak);
-    showToast(streak >= 3 ? `🔥 ${streak} day streak on "${habit.name}"!` : `✓ "${habit.name}" done!`);
-    scheduleNotification(habit);
+    if (isViewingToday()) {
+      checkMilestone(habit, streak);
+      showToast(streak >= 3 ? `🔥 ${streak} day streak on "${habit.name}"!` : `✓ "${habit.name}" done!`);
+      scheduleNotification(habit);
+    } else {
+      showToast(`✓ Logged for ${viewDate.toLocaleDateString('en-US', { month:'short', day:'numeric' })}`);
+    }
   }
 }
 
 async function useFreeze(idx) {
-  const today = todayStr();
+  const viewing = viewDateStr();
   const habit = data.habits[idx];
   if (!habit || habit.freezesLeft <= 0) return;
-  const entry = habit.completions[today];
+  const entry = habit.completions[viewing];
   if (getEntryDone(entry)) return;
   const note = entry && entry.note ? entry.note : undefined;
-  habit.completions[today] = { freeze: true, note };
+  habit.completions[viewing] = { freeze: true, note };
   habit.freezesLeft--;
   render();
   await saveData(habit);
@@ -1502,7 +1609,7 @@ let noteIdx = null;
 function openNoteModal(idx) {
   noteIdx = idx;
   const habit = data.habits[idx];
-  const today = todayStr();
+  const today = viewDateStr();
   const entry = habit.completions[today];
   const existingNote = entry && entry.note ? entry.note : '';
   document.getElementById('note-modal-title').textContent = `Note for "${habit.name}"`;
@@ -1524,7 +1631,7 @@ document.getElementById('note-modal').addEventListener('click', e => {
 document.getElementById('note-save').addEventListener('click', async () => {
   if (noteIdx === null) return;
   const note = document.getElementById('note-textarea').value.trim();
-  const today = todayStr();
+  const today = viewDateStr();
   const habit = data.habits[noteIdx];
   const entry = habit.completions[today];
   const isDone = getEntryDone(entry);
@@ -1719,13 +1826,180 @@ function showToast(msg) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  DATE DISPLAY
+//  DATE NAVIGATION
 // ══════════════════════════════════════════════════════════════════
 
+// viewDate: the date currently being viewed (may differ from today)
+let viewDate = new Date();
+viewDate.setHours(0,0,0,0);
+
+function viewDateStr() { return dateStr(viewDate); }
+
+function isViewingToday() { return viewDateStr() === todayStr(); }
+
 function updateDate() {
-  document.getElementById('date-display').textContent =
-    new Date().toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+  const pill = document.getElementById('date-display');
+  const isPast = !isViewingToday();
+  pill.textContent = viewDate.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+  pill.classList.toggle('past', isPast);
+
+  // Arrows
+  const prevBtn = document.getElementById('prev-day-btn');
+  const nextBtn = document.getElementById('next-day-btn');
+  const earliest = new Date(); earliest.setDate(earliest.getDate() - 30); earliest.setHours(0,0,0,0);
+  prevBtn.disabled = viewDate <= earliest;
+  nextBtn.disabled = isViewingToday();
+
+  // Past banner
+  const banner = document.getElementById('past-banner');
+  const bannerText = document.getElementById('past-banner-text');
+  if (isPast) {
+    banner.classList.add('show');
+    bannerText.textContent = `Viewing ${viewDate.toLocaleDateString('en-US', { weekday:'long', month:'short', day:'numeric' })}`;
+  } else {
+    banner.classList.remove('show');
+  }
+
+  // Add/template section — hide on past dates
+  document.getElementById('add-habit-section').style.display = isPast ? 'none' : 'block';
+
+  // Section label
+  document.getElementById('today-habits-label').textContent =
+    isPast ? `Habits on ${viewDate.toLocaleDateString('en-US', { month:'short', day:'numeric' })}` : 'Today\'s habits';
 }
+
+function goToDay(d) {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const earliest = new Date(); earliest.setDate(earliest.getDate() - 30); earliest.setHours(0,0,0,0);
+  if (d > today) d = today;
+  if (d < earliest) d = earliest;
+  viewDate = new Date(d);
+  updateDate();
+  render();
+  closeCalendar();
+}
+
+document.getElementById('prev-day-btn').addEventListener('click', () => {
+  const d = new Date(viewDate); d.setDate(d.getDate() - 1); goToDay(d);
+});
+document.getElementById('next-day-btn').addEventListener('click', () => {
+  const d = new Date(viewDate); d.setDate(d.getDate() + 1); goToDay(d);
+});
+document.getElementById('back-today-btn').addEventListener('click', () => {
+  viewDate = new Date(); viewDate.setHours(0,0,0,0);
+  updateDate(); render(); closeCalendar();
+});
+
+// ── Calendar picker ──────────────────────────────────────────────
+
+let calOpen = false;
+let calMonth = new Date(); // which month the calendar is showing
+
+function openCalendar() {
+  calMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+  renderCalendar();
+  document.getElementById('cal-dropdown').classList.add('open');
+  calOpen = true;
+}
+
+function closeCalendar() {
+  document.getElementById('cal-dropdown').classList.remove('open');
+  calOpen = false;
+}
+
+function renderCalendar() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const earliest = new Date(); earliest.setDate(today.getDate() - 30); earliest.setHours(0,0,0,0);
+
+  const year = calMonth.getFullYear();
+  const month = calMonth.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+  // Can we go prev/next month?
+  const prevMonthStart = new Date(year, month - 1, 1);
+  const nextMonthStart = new Date(year, month + 1, 1);
+  const canGoPrev = prevMonthStart <= earliest || new Date(year, month, 0) >= earliest;
+  const canGoNext = nextMonthStart <= today;
+
+  // Build completion dots for this month
+  const compMap = {};
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dd = new Date(year, month, d);
+    if (dd > today || dd < earliest) continue;
+    const key = dateStr(dd);
+    const scheduled = data.habits.filter(h => {
+      // approximate — use current schedule
+      return true;
+    });
+    const total = data.habits.length;
+    const done = data.habits.filter(h => getEntryDone(h.completions[key])).length;
+    if (total === 0) compMap[key] = 'none';
+    else if (done === total) compMap[key] = 'full';
+    else if (done > 0) compMap[key] = 'partial';
+    else compMap[key] = 'none';
+  }
+
+  const monthLabel = new Date(year, month, 1).toLocaleDateString('en-US', { month:'long', year:'numeric' });
+
+  let html = `
+    <div class="cal-header">
+      <button class="cal-nav-btn" id="cal-prev-btn" ${!canGoPrev ? 'disabled' : ''}>‹</button>
+      <span class="cal-month-label">${monthLabel}</span>
+      <button class="cal-nav-btn" id="cal-next-btn" ${!canGoNext ? 'disabled' : ''}>›</button>
+    </div>
+    <div class="cal-grid">
+      ${['S','M','T','W','T','F','S'].map(d => `<div class="cal-day-header">${d}</div>`).join('')}
+      ${Array(firstDay).fill('<div class="cal-day empty"></div>').join('')}
+  `;
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dd = new Date(year, month, d); dd.setHours(0,0,0,0);
+    const key = dateStr(dd);
+    const isToday = key === todayStr();
+    const isSelected = key === viewDateStr();
+    const isDisabled = dd > today || dd < earliest;
+    const comp = compMap[key] || 'none';
+
+    html += `<div class="cal-day${isSelected?' selected':''}${isToday?' today-cal':''}${isDisabled?' disabled':''}" data-date="${key}">
+      ${d}
+      ${!isDisabled && comp !== 'none' ? `<div class="cal-dot ${comp}"></div>` : ''}
+    </div>`;
+  }
+
+  html += '</div>';
+  const el = document.getElementById('cal-dropdown');
+  el.innerHTML = html;
+
+  el.querySelector('#cal-prev-btn')?.addEventListener('click', e => {
+    e.stopPropagation();
+    calMonth = new Date(year, month - 1, 1);
+    renderCalendar();
+  });
+  el.querySelector('#cal-next-btn')?.addEventListener('click', e => {
+    e.stopPropagation();
+    calMonth = new Date(year, month + 1, 1);
+    renderCalendar();
+  });
+  el.querySelectorAll('.cal-day:not(.disabled):not(.empty)').forEach(cell => {
+    cell.addEventListener('click', e => {
+      e.stopPropagation();
+      const d = new Date(cell.dataset.date + 'T00:00:00');
+      goToDay(d);
+    });
+  });
+}
+
+document.getElementById('date-display').addEventListener('click', e => {
+  e.stopPropagation();
+  if (calOpen) closeCalendar(); else openCalendar();
+});
+
+document.addEventListener('click', e => {
+  if (calOpen && !document.getElementById('cal-dropdown').contains(e.target)) {
+    closeCalendar();
+  }
+});
 
 // ══════════════════════════════════════════════════════════════════
 //  AUTH
