@@ -541,6 +541,40 @@
     .sync-dot.syncing { background: var(--warning); animation: pulse 1s infinite; }
     @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
 
+    /* ── Guest banner ── */
+    .guest-banner {
+      background: linear-gradient(135deg, rgba(124,106,247,0.12), rgba(168,156,255,0.08));
+      border-bottom: 1px solid rgba(124,106,247,0.25);
+      padding: 10px 20px;
+      display: flex; align-items: center; justify-content: center; gap: 10px;
+      flex-wrap: wrap; text-align: center;
+    }
+    .guest-banner-text { font-size: 0.82rem; color: var(--text-muted); }
+    .guest-banner-text strong { color: var(--text); }
+    .btn-signin-banner {
+      background: var(--accent); color: #fff; border: none;
+      border-radius: 8px; padding: 6px 14px; font-size: 0.8rem; font-weight: 600;
+      cursor: pointer; transition: opacity 0.15s; white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .btn-signin-banner:hover { opacity: 0.85; }
+
+    /* ── Auth divider ── */
+    .auth-divider {
+      display: flex; align-items: center; gap: 12px; margin: 20px 0;
+      color: var(--text-muted); font-size: 0.78rem;
+    }
+    .auth-divider::before, .auth-divider::after {
+      content: ''; flex: 1; height: 1px; background: var(--border);
+    }
+    .btn-guest {
+      width: 100%; background: transparent; border: 1px solid var(--border);
+      color: var(--text-muted); border-radius: 10px; padding: 12px;
+      font-size: 0.9rem; font-weight: 500; cursor: pointer;
+      transition: border-color 0.15s, color 0.15s;
+    }
+    .btn-guest:hover { border-color: var(--accent); color: var(--text); }
+
     /* ── Responsive ── */
     @media (max-width: 420px) {
       .summary { gap: 7px; }
@@ -566,7 +600,9 @@
       <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" />
       Continue with Google
     </button>
-    <div class="auth-footer">Your data is private and only visible to you.</div>
+    <div class="auth-divider">or</div>
+    <button class="btn-guest" id="guest-btn">Continue as Guest</button>
+    <div class="auth-footer">Guest data is saved on this device only.<br>Sign in anytime to sync across devices.</div>
   </div>
 </div>
 
@@ -592,6 +628,12 @@
     <button class="nav-tab" data-view="stats">Stats</button>
   </div>
 </header>
+
+<!-- ═══════════════════════════ GUEST BANNER ═════════════════════ -->
+<div class="guest-banner" id="guest-banner" style="display:none">
+  <span class="guest-banner-text"><strong>Guest mode</strong> — your data is only saved on this device</span>
+  <button class="btn-signin-banner" id="banner-signin-btn">Sign in to sync</button>
+</div>
 
 <!-- ═══════════════════════════ TODAY VIEW ═══════════════════════ -->
 <main>
@@ -879,10 +921,10 @@ let data = loadLocalData();
 if (!data.habits) data.habits = [];
 if (!data.theme) data.theme = 'dark';
 
-// saveData now syncs to DB if logged in
+// saveData syncs to DB if logged in, local-only for guests
 async function saveData(habit) {
   saveLocal();
-  if (currentUser && habit) await saveHabitToDB(habit);
+  if (currentUser && !isGuest && habit) await saveHabitToDB(habit);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1304,7 +1346,7 @@ async function deleteHabit(idx) {
   saveLocal();
   render();
   if (activeView === 'stats') renderStats();
-  if (id) await deleteHabitFromDB(id);
+  if (id && !isGuest) await deleteHabitFromDB(id);
   showToast(`Deleted "${name}"`);
 }
 
@@ -1689,6 +1731,8 @@ function updateDate() {
 //  AUTH
 // ══════════════════════════════════════════════════════════════════
 
+let isGuest = false;
+
 function showLoadingScreen() {
   document.getElementById('loading-screen').style.display = 'flex';
   document.getElementById('auth-screen').style.display = 'none';
@@ -1710,25 +1754,53 @@ function showApp() {
 function setUserUI(user) {
   const nameEl = document.getElementById('user-name');
   const avatarEl = document.getElementById('user-avatar');
-  const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'You';
-  const avatar = user.user_metadata?.avatar_url;
-  nameEl.textContent = name;
-  if (avatar) { avatarEl.src = avatar; avatarEl.style.display = 'block'; }
-  else { avatarEl.style.display = 'none'; }
+  const signoutBtn = document.getElementById('signout-btn');
+  const guestBanner = document.getElementById('guest-banner');
+
+  if (user) {
+    const name = user.user_metadata?.full_name || user.email?.split('@')[0] || 'You';
+    const avatar = user.user_metadata?.avatar_url;
+    nameEl.textContent = name;
+    if (avatar) { avatarEl.src = avatar; avatarEl.style.display = 'block'; }
+    else { avatarEl.style.display = 'none'; }
+    signoutBtn.textContent = 'Sign out';
+    guestBanner.style.display = 'none';
+  } else {
+    // Guest mode
+    nameEl.textContent = 'Guest';
+    avatarEl.style.display = 'none';
+    signoutBtn.textContent = 'Sign in';
+    guestBanner.style.display = 'flex';
+  }
 }
 
-document.getElementById('google-signin-btn').addEventListener('click', async () => {
+async function signInWithGoogle() {
   const { error } = await sb.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: window.location.href }
   });
   if (error) showToast('Sign in failed: ' + error.message);
+}
+
+document.getElementById('google-signin-btn').addEventListener('click', signInWithGoogle);
+document.getElementById('banner-signin-btn').addEventListener('click', signInWithGoogle);
+
+// Guest mode button
+document.getElementById('guest-btn').addEventListener('click', () => {
+  initGuestApp();
 });
 
+// Sign out / sign in button
 document.getElementById('signout-btn').addEventListener('click', async () => {
+  if (isGuest) {
+    // Guest clicking "Sign in" → go to auth screen
+    showAuthScreen();
+    return;
+  }
   await sb.auth.signOut();
   currentUser = null;
-  data.habits = [];
+  isGuest = false;
+  data.habits = loadLocalData().habits || [];
   showAuthScreen();
 });
 
@@ -1736,8 +1808,31 @@ document.getElementById('signout-btn').addEventListener('click', async () => {
 //  INIT
 // ══════════════════════════════════════════════════════════════════
 
+function initGuestApp() {
+  isGuest = true;
+  currentUser = null;
+  showApp();
+  setUserUI(null);
+  applyTheme(data.theme);
+  updateDate();
+  renderTemplates();
+  render();
+  setupReminderLoop();
+  requestNotificationPermission();
+
+  const now = new Date();
+  const msToMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1) - now;
+  setTimeout(() => { updateDate(); render(); }, msToMidnight);
+}
+
 async function initApp(user) {
+  isGuest = false;
   currentUser = user;
+
+  // Migrate guest habits into the user's account if any exist locally
+  const localHabits = loadLocalData().habits || [];
+  const hadGuestHabits = localHabits.length > 0 && localHabits.some(h => !h.id);
+
   setUserUI(user);
   showApp();
   applyTheme(data.theme);
@@ -1745,21 +1840,32 @@ async function initApp(user) {
   renderTemplates();
   render();
   await loadHabitsFromDB();
+
+  // If user had guest habits and no cloud habits yet, upload them
+  if (hadGuestHabits && data.habits.length === 0) {
+    data.habits = localHabits.map(h => ({ ...h, id: undefined }));
+    render();
+    for (const habit of data.habits) {
+      await saveHabitToDB(habit);
+    }
+    saveLocal();
+    showToast('Guest habits saved to your account!');
+  } else if (hadGuestHabits && data.habits.length > 0) {
+    showToast('Signed in — cloud habits loaded');
+  }
+
   setupReminderLoop();
   requestNotificationPermission();
 
-  // Midnight refresh
   const now = new Date();
   const msToMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1) - now;
   setTimeout(() => { updateDate(); render(); }, msToMidnight);
 }
 
-// Listen for auth state changes
+// Listen for auth state changes (handles redirect back from Google)
 sb.auth.onAuthStateChange(async (event, session) => {
-  if (session?.user) {
+  if (event === 'SIGNED_IN' && session?.user) {
     await initApp(session.user);
-  } else {
-    showAuthScreen();
   }
 });
 
