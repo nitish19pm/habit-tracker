@@ -800,7 +800,7 @@
   <!-- ═══════════════════════════ STATS VIEW ═══════════════════════ -->
   <div class="view" id="view-stats">
     <div style="margin-top:12px; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
-      <div class="section-title">Activity (past week)</div>
+      <div class="section-title">Activity (past month)</div>
       <button class="btn-export" id="export-btn">⬇ Export CSV</button>
     </div>
 
@@ -1295,7 +1295,7 @@ function renderHeatmap() {
   const monthsEl = document.getElementById('heatmap-months');
   grid.innerHTML = ''; monthsEl.innerHTML = '';
 
-  const WEEKS = 1;
+  const WEEKS = 4;
   const today = new Date();
   // Align to Sunday
   const startDay = new Date(today);
