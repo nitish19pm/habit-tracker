@@ -1277,6 +1277,7 @@ function render() {
 
     list.appendChild(card);
   });
+  attachRipples();
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1874,10 +1875,6 @@ function attachRipples() {
     el.addEventListener('click', addRipple);
   });
 }
-
-// Re-attach after each render since habits-list is rebuilt
-const _origRender = render;
-function render() { _origRender(); attachRipples(); }
 
 attachRipples();
 
