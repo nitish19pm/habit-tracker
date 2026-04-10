@@ -31,7 +31,7 @@ reminder_time text, completions jsonb, freezes_left integer, created_at timestam
 - **Notes** — add a note to any habit on any day
 - **Milestone celebrations** — animated popup at 7, 14, 21, 30, 50, 100 day streaks
 - **Quick templates** — 10 pre-built habits (Drink water, Exercise, Meditate, etc.)
-- **Stats view** — 16-week activity heatmap, completion rates, habit strength score (0-100)
+- **Stats view** — 1-week activity heatmap (default), completion rates, habit strength score (0-100)
 - **CSV export** of full history
 - **Light/dark mode toggle** (persisted)
 - **Date navigation** — arrow buttons + tap-to-open calendar picker to view/edit any past 30 days
@@ -59,6 +59,7 @@ Vercel picks it up automatically. No build step needed.
 - **completions stored as JSONB** — each key is a date string `YYYY-MM-DD`, value is `true`, `false`, or `{ done, freeze, note }`
 - **Row Level Security** — Supabase policy ensures `auth.uid() = user_id` on all queries
 - **viewDate** — a global `Date` object tracking which date is currently being viewed (may differ from today)
+- **Do NOT redeclare functions** inside `<script type="module">` — caused a silent crash. Instead call helpers at the end of the original function (e.g. `attachRipples()` at end of `render()`)
 
 ## What the user wants next (ideas discussed)
 - More stats/insights (missed day patterns, best time of day)
